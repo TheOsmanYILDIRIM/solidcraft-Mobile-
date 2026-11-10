@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>SolidCraft Mobile</title>
+<style>
+:root{--scale:1;--bg:#161d27;--panel:#252e39;--line:#425167;--ink:#eef4fa;--muted:#a8b8c9;--blue:#438acb;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font:14px system-ui,Arial}
+button,input,select,textarea{font:inherit}button{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;padding:8px 10px;min-height:38px;touch-action:manipulation}
+button:disabled{opacity:.35}button:focus-visible,input:focus-visible{outline:2px solid var(--blue)}button.active{background:var(--blue);border-color:var(--blue);color:white}
+#app{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg)}
+#app.light{--bg:#e9eff5;--panel:#fff;--line:#b6c5d7;--ink:#14293d;--muted:#596d82;--blue:#266cbb;color-scheme:light}
+header{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line);padding:calc(5px + env(safe-area-inset-top)) 8px 6px;flex:none;min-height:51px}
+header b{white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:15px}
+header .grow{flex:1}header button{min-width:35px;padding:6px}
+.logo{color:var(--blue);font-size:22px}
+#stage{position:relative;flex:1;min-height:0;overflow:hidden}
+iframe{display:block;width:100%;height:100%;border:0;background:#131c27;touch-action:auto}
+#empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;background:radial-gradient(circle,#293c53,#111924)}
+#empty .illustration{font-size:76px;color:#84a6c7}#empty p{color:#afc0d4;font-size:13px;max-width:310px}#empty h3{margin-bottom:4px}
+#rail{position:absolute;left:8px;top:9px;display:flex;flex-direction:column;gap:6px}#rail button{width:42px;height:42px;font-size:18px}
+#view{position:absolute;right:8px;top:9px;display:flex;flex-direction:column;gap:6px}#view button{min-width:38px}
+#footer{flex:none;border-top:1px solid var(--line);padding:7px 8px calc(7px + env(safe-area-inset-bottom))}
+#tools{display:flex;gap:6px;overflow:auto;margin-bottom:7px;min-height:36px;scrollbar-width:none}#tools button{white-space:nowrap;flex:none;font-size:calc(12px * var(--scale))}
+#bottom{display:flex;gap:5px}#bottom button{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:calc(11px * min(var(--scale),1.35));padding:6px 3px}
+#veil{position:absolute;inset:0;background:#0009;z-index:4}
+#sheet{position:absolute;bottom:0;left:0;right:0;z-index:5;max-height:80%;display:flex;flex-direction:column;border:1px solid var(--line);background:var(--bg);border-radius:18px 18px 0 0;font-size:calc(13px * var(--scale))}
+#veil[hidden],#sheet[hidden],#empty[hidden]{display:none}
+#sheetTop{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--line);flex:none}
+#sheetTop strong{overflow:hidden;text-overflow:ellipsis}#sheetTop button{min-width:40px}
+#sheetBody{padding:12px;overflow:auto;overscroll-behavior:contain}
+.section{margin:8px 0 12px;padding:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.row{display:flex;gap:8px;align-items:center;margin:8px 0}.row>*{flex:1;min-width:0}
+.sub{color:var(--muted);font-size:.88em}input,select,textarea{max-width:100%;min-height:38px;padding:8px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px}
+input[type=range]{width:100%;accent-color:var(--blue)}textarea{width:100%;min-height:120px;font-family:monospace}
+.actions{display:flex;gap:7px;flex-wrap:wrap}.actions button{flex:1}
+.record{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.record .desc{flex:1;min-width:0;overflow-wrap:anywhere}.record small{display:block;color:var(--muted)}.record button{flex:none;min-width:35px}
+#toast{position:absolute;bottom:90px;left:10px;right:10px;z-index:10;background:#60322c;color:#fff;padding:12px;border-radius:9px;border:1px solid #ae6659}
+#toast[hidden]{display:none}
+#app.native header,#app.native #footer,#app.native #rail,#app.native #view,#app.native #empty{display:none}
+#backMobile{position:absolute;left:10px;top:10px;z-index:6}
+@media(min-width:700px){#sheet{left:auto;bottom:8px;right:8px;width:min(430px,90%);max-height:calc(100% - 16px);border-radius:16px}}
+</style></head>
+<body><div id="app">
+<header><span class="logo">⬡</span><b>SolidCraft · Mobile</b><span class="grow"></span><button data-act="undo" title="Undo">↶</button><button data-act="redo" title="Redo">↷</button><button data-act="files" title="Files">▤</button><button data-act="settings" title="Settings">⚙</button></header>
+<div id="stage"><iframe id="cad" title="SolidCraft CAD engine"></iframe>
+<div id="empty"><div><div class="illustration">⬡</div><h3 id="emptyTitle">SolidCraft motoru bekleniyor</h3><p id="emptyText">Gerçek CAD işlemleri için Rust/WASM derlemesini app/ dizinine yerleştirin. Bu görüntü CAD modeli değildir.</p></div></div>
+<nav id="rail"><button data-mode="model" class="active" title="Model">⬡</button><button data-mode="sketch" title="Sketch">✎</button><button data-mode="inspect" title="Inspect">⌖</button><button data-act="commands" title="All commands">⌕</button></nav>
+<nav id="view"><button data-act="home" title="Home view">⌂</button><button data-act="history" title="History">▱</button></nav></div>
+<footer id="footer"><div id="tools"><button data-act="commands">•••</button></div><div id="bottom"><button data-mode="model">Model</button><button data-mode="sketch">Eskiz</button><button data-mode="inspect">İncele</button><button data-act="history">Geçmiş</button><button data-act="commands">Tümü</button></div></footer>
+<div id="veil" hidden></div><section id="sheet" role="dialog" aria-modal="true" hidden><div id="sheetTop"><strong id="sheetTitle"></strong><button data-act="close" title="Close">×</button></div><div id="sheetBody"></div></section>
+<div id="toast" role="status" hidden></div><input id="upload" type="file" accept=".json,application/json" hidden>
+</div><script type="module" src="./app.js"></script></body></html>

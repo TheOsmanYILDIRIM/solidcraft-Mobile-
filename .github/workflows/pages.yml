@@ -70,7 +70,21 @@ jobs:
       - name: Add the web app channels (stable and release candidate from their releases, edge from this build)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash packaging/web-channels.sh site dist/web
+        run: |
+          stable="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '[.[] | select(.draft == false and .prerelease == false)][0].tag_name // empty')"
+          if [ -n "$stable" ]; then
+            bash packaging/web-channels.sh site dist/web
+          else
+            echo "This fork has no stable release. Publish the current Rust/WASM build in app and app-edge."
+            mkdir -p site/app site/app-edge site/app-rc
+            cp -R dist/web/. site/app/
+            cp -R dist/web/. site/app-edge/
+            printf '%s\n' '<!doctype html><html lang="en"><meta charset="utf-8"><title>No release candidate</title><p>Use <a href="../app-edge/">the current build</a>.</p></html>' > site/app-rc/index.html
+          fi
+      - name: Include the touch-first mobile interface
+        run: |
+          mkdir -p site/mobile
+          cp mobile/index.html mobile/app.js site/mobile/
       - uses: actions/configure-pages@v5
         id: pages
       - name: Install Flatpak repository tools
