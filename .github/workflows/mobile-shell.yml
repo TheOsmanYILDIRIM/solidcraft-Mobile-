@@ -1,0 +1,18 @@
+name: Mobile shell validation
+on:
+  push:
+    branches: [feature/mobile-pages-shell-20261111]
+    paths: ["mobile/**", ".github/workflows/pages.yml", ".github/workflows/mobile-shell.yml"]
+  pull_request:
+    paths: ["mobile/**", ".github/workflows/pages.yml", ".github/workflows/mobile-shell.yml"]
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check mobile shell syntax and integration assumptions
+        working-directory: mobile
+        run: npm run check
