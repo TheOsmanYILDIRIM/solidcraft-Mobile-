@@ -41,6 +41,7 @@ concurrency:
 jobs:
   build:
     name: Build and publish SolidCore's site
+    if: github.repository == 'tangency-labs/solidcraft'
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 30
     steps:
