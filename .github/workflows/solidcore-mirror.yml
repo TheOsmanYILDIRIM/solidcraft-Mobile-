@@ -46,6 +46,7 @@ env:
 jobs:
   mirror:
     name: Mirror main's kernel commits
+    if: github.repository == 'tangency-labs/solidcraft'
     runs-on: ubuntu-24.04
     # Incremental: seconds per run.
     timeout-minutes: 15
