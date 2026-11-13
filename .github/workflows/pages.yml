@@ -60,6 +60,8 @@ jobs:
       - name: Build the web app
         working-directory: apps/solidcraft-web
         run: trunk build --release --public-url ./
+      - name: Verify the actual CAD browser command API
+        run: cargo xtask web-api-test --site dist/web
       # Fork release unblock: the upstream offline multi-tab update regression is tracked
       # separately. Do not treat its failure as a passing regression test.
       - name: Test the web app offline and across an update (headless Chrome)
@@ -92,6 +94,29 @@ jobs:
         run: |
           mkdir -p site/mobile
           cp mobile/index.html mobile/app.js site/mobile/
+      - name: Open the real CAD application at the Pages root
+        run: |
+          # Keep the user guide under its own paths. Replace only the root index.
+          test -s site/app-edge/index.html
+          test -s site/mobile/index.html
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <meta http-equiv="refresh" content="0;url=app-edge/">
+          <title>SolidCraft CAD</title>
+          <script>location.replace(new URL("app-edge/" + location.search + location.hash, location.href));</script>
+          </head>
+          <body>
+          <p>Opening the real SolidCraft CAD application…</p>
+          <p><a href="app-edge/">Open CAD</a> · <a href="mobile/">Touch-first interface</a> · <a href="guide/">Documentation</a></p>
+          </body>
+          </html>
+          HTML
+          grep -q 'app-edge/' site/index.html
+          test -s site/app-edge/index.html
       - uses: actions/configure-pages@v5
         id: pages
       - name: Install Flatpak repository tools
