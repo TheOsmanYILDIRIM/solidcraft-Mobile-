@@ -1,20 +1,16 @@
-# The documentation site on GitHub Pages: the book (docs/book) at https://docs.solidcraft.io/
-# and the web app at /app/ (the latest release), /app-rc/ (the newest release candidate) and
-# /app-edge/ (this commit). Needs Settings → Pages → Source = GitHub Actions; skipped while the
-# repository is private.
+# Fork Pages: use verified upstream SolidCraft web artifacts, not local Rust builds.
 name: Pages
 
 on:
   push:
     branches: [main]
-    # The site is the book and the web app: test data and the GitHub bots' scripts change neither.
     paths-ignore: ["tests/**", "scripts/claim/**", "scripts/triage/**"]
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Published release for Flatpak (empty: latest stable release)"
-        type: string
+        description: "Upstream stable release tag (empty: latest stable)"
         required: false
+        type: string
         default: ""
 
 permissions:
@@ -26,79 +22,51 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
-env:
-  CARGO_TERM_COLOR: always
-  MDBOOK_VERSION: v0.5.4
-  TRUNK_VERSION: v0.21.14
-
 jobs:
   build:
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - name: Install mdbook and trunk
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -sSL "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "$HOME/.local/bin"
-          curl -sSL "https://github.com/trunk-rs/trunk/releases/download/${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Install a software Vulkan driver (lavapipe)
-        # The book's pictures are `solidcraft-cli snapshot`s, drawn on the GPU; the runner has none.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1
-      - name: Build the book
-        env:
-          SOLIDCRAFT_GPU: software
-        run: cargo xtask book
-      - name: Build the web app
-        working-directory: apps/solidcraft-web
-        run: trunk build --release --public-url ./
-      - name: Verify the actual CAD browser command API
-        run: cargo xtask web-api-test --site dist/web
-      # Fork release unblock: the upstream offline multi-tab update regression is tracked
-      # separately. Do not treat its failure as a passing regression test.
-      - name: Test the web app offline and across an update (headless Chrome)
-        id: offline_test
-        continue-on-error: true
-        run: cargo xtask web-offline-test --site dist/web
-      - name: Report offline update regression without blocking the preview deploy
-        if: steps.offline_test.outcome == 'failure'
-        run: echo "::warning::Offline update regression failed; the site can publish but offline updates are not verified."
-      - name: Assemble the site
-        run: |
-          mkdir -p site
-          cp -r target/book/. site/
-          bash docs/book/seo.sh site  # canonical links, robots.txt, sitemap.xml
-      - name: Add the web app channels (stable and release candidate from their releases, edge from this build)
+      - name: Download and verify the upstream CAD web release
         env:
           GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.release_tag || '' }}
+        shell: bash
         run: |
-          stable="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '[.[] | select(.draft == false and .prerelease == false)][0].tag_name // empty')"
-          if [ -n "$stable" ]; then
-            bash packaging/web-channels.sh site dist/web
-          else
-            echo "This fork has no stable release. Publish the current Rust/WASM build in app and app-edge."
-            mkdir -p site/app site/app-edge site/app-rc
-            cp -R dist/web/. site/app/
-            cp -R dist/web/. site/app-edge/
-            printf '%s\n' '<!doctype html><html lang="en"><meta charset="utf-8"><title>No release candidate</title><p>Use <a href="../app-edge/">the current build</a>.</p></html>' > site/app-rc/index.html
+          set -euo pipefail
+          upstream="tangency-labs/solidcraft"
+          tag="$REQUESTED_TAG"
+          if [ -z "$tag" ]; then
+            tag="$(gh api "repos/$upstream/releases/latest" --jq '.tag_name')"
           fi
-      - name: Include the touch-first mobile interface
-        run: |
-          mkdir -p site/mobile
+          test -n "$tag"
+          zip="solidcraft-web-${tag#v}.zip"
+          mkdir -p "$RUNNER_TEMP/solidcraft-download" "$RUNNER_TEMP/solidcraft-unpacked"
+          gh release download "$tag" --repo "$upstream" --dir "$RUNNER_TEMP/solidcraft-download" --pattern "$zip"
+          gh release download "$tag" --repo "$upstream" --dir "$RUNNER_TEMP/solidcraft-download" --pattern SHA256SUMS.txt
+          cd "$RUNNER_TEMP/solidcraft-download"
+          expected="$(awk -v file="$zip" '$2 == file || $2 == "*"file { print $1; found=1; exit } END { if (!found) exit 1 }' SHA256SUMS.txt)"
+          printf '%s  %s\n' "$expected" "$zip" | sha256sum --check --status
+          unzip -q "$zip" -d "$RUNNER_TEMP/solidcraft-unpacked"
+          entry="$(find "$RUNNER_TEMP/solidcraft-unpacked" -maxdepth 3 -type f -name index.html -print -quit)"
+          test -n "$entry"
+          source_dir="$(dirname "$entry")"
+          test -s "$source_dir/sw.js"
+          test -s "$source_dir/index.html"
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p site/app-edge site/app site/mobile site/guide site/docs
+          cp -a "$source_dir"/. site/app-edge/
+          cp -a "$source_dir"/. site/app/
           cp mobile/index.html mobile/app.js site/mobile/
-      - name: Open the real CAD application at the Pages root
+          printf '%s\n' "$tag" > site/UPSTREAM_RELEASE.txt
+          echo "Upstream web release: $tag"
+          echo "Verified SHA256: $expected"
+      - name: Open the CAD app and link upstream documentation
+        shell: bash
         run: |
-          # Keep the user guide under its own paths. Replace only the root index.
-          test -s site/app-edge/index.html
-          test -s site/mobile/index.html
+          set -euo pipefail
           cat > site/index.html <<'HTML'
           <!doctype html>
           <html lang="en">
@@ -109,32 +77,20 @@ jobs:
           <title>SolidCraft CAD</title>
           <script>location.replace(new URL("app-edge/" + location.search + location.hash, location.href));</script>
           </head>
-          <body>
-          <p>Opening the real SolidCraft CAD application…</p>
-          <p><a href="app-edge/">Open CAD</a> · <a href="mobile/">Touch-first interface</a> · <a href="guide/">Documentation</a></p>
-          </body>
+          <body><p><a href="app-edge/">Open CAD</a> · <a href="mobile/">Mobile interface</a> · <a href="https://docs.solidcraft.io/">Documentation</a></p></body>
           </html>
           HTML
-          grep -q 'app-edge/' site/index.html
+          cat > site/guide/index.html <<'HTML'
+          <!doctype html><html lang="en"><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=https://docs.solidcraft.io/"><title>SolidCraft docs</title><p><a href="https://docs.solidcraft.io/">Open official documentation</a></p></html>
+          HTML
+          cp site/guide/index.html site/docs/index.html
           test -s site/app-edge/index.html
+          test -s site/mobile/app.js
+          grep -q 'app-edge/' site/index.html
       - uses: actions/configure-pages@v5
-        id: pages
-      - name: Install Flatpak repository tools
-        if: github.repository == 'tangency-labs/solidcraft'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak ostree
-      - name: Include the published Flatpak repository
-        if: github.repository == 'tangency-labs/solidcraft'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag || '' }}
-          PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
-        run: bash packaging/flatpak-site.sh site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
-
   deploy:
     needs: build
     runs-on: ubuntu-latest
